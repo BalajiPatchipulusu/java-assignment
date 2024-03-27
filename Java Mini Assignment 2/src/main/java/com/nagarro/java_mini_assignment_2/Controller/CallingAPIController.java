@@ -1,83 +1,61 @@
 package com.nagarro.java_mini_assignment_2.Controller;
 
-import com.nagarro.java_mini_assignment_2.Entity.UserDetails;
-import com.nagarro.java_mini_assignment_2.Service.RandomUserService;
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.reactive.function.client.WebClient;
 
-import java.util.concurrent.CompletableFuture;
+import com.nagarro.java_mini_assignment_2.Entity.UserRequest;
+import com.nagarro.java_mini_assignment_2.Entity.UserDetailsResponse;
+import com.nagarro.java_mini_assignment_2.Response.FinalApiResponse;
+import com.nagarro.java_mini_assignment_2.Service.RandomUserService;
+import com.nagarro.java_mini_assignment_2.Service.UserService;
+import com.nagarro.java_mini_assignment_2.Exception.*;
 
 @RestController
-@RequestMapping("/api")
+
+
 public class CallingAPIController {
 
     @Autowired
-    private RandomUserService userService;
+    public  RandomUserService randomUserApi;
 
     @Autowired
-    private WebClient.Builder webClientBuilder;
+    public UserService secondApiService;
 
-    @Value("${api.nationalize.url}")
-    private String nationalizeApiUrl;
-
-    @Value("${api.genderize.url}")
-    private String genderizeApiUrl;
-
-    @GetMapping("/getRandomUser")
-    public CompletableFuture<UserDetails> getRandomUser() {
-        return userService.getRandomUserDetails();
-    }
-
-    @GetMapping("/process-user")
-    public String processUser() {
-        CompletableFuture<UserDetails> userDetailsFuture = userService.getRandomUserDetails();
-
+    @PostMapping("/users")
+    public ResponseEntity<?> createUsers(@RequestBody UserRequest size) {
         try {
-            UserDetails userDetails = userDetailsFuture.get();
-            String name = userDetails.getName();
-
-            // Call the /gender-and-nationalize endpoint with the fetched name
-            String genderAndNationalizeResult = webClientBuilder.build()
-                    .get()
-                    .uri("/api/gender-and-nationalize?name=" + name)
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
-
-            // Log the result
-            System.out.println("Result from /gender-and-nationalize endpoint: " + genderAndNationalizeResult);
-
-            // Continue with verification and saving user data
-            String nationality = getNationalityFromResult(genderAndNationalizeResult);
-            String gender = getGenderFromResult(genderAndNationalizeResult);
-
-            System.out.println("Nationality: " + nationality);
-            System.out.println("Gender: " + gender);
-
-            return "User processed successfully";
-
+            int requestSize = size.getSize();
+            List<UserDetailsResponse> createdUsers = randomUserApi.createUsers(requestSize);
+            return ResponseEntity.ok(createdUsers);
         } catch (Exception e) {
-            e.printStackTrace();
-            return "Error processing user";
+            ErrorMessage error = new ErrorMessage("page not found, User creation failed", 404);
+            return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
         }
     }
 
-    private String getNationalityFromResult(String result) {
-        // Implement logic to extract nationality from the result
-        // For example, you can use regular expressions or JSON parsing
-        // Return the extracted nationality
-        return "IN";
+    @GetMapping("/users")
+    public ResponseEntity<?> getUsers(
+            @RequestParam String sortType,
+            @RequestParam String sortOrder,
+            @RequestParam int limit,
+            @RequestParam int offset) {
+        try {
+            FinalApiResponse result = secondApiService.getSortedUsers(sortType, sortOrder, limit, offset);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            ErrorMessage error = new ErrorMessage("page not found", 404);
+            return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+        }
     }
 
-    private String getGenderFromResult(String result) {
-        // Implement logic to extract gender from the result
-        // For example, you can use regular expressions or JSON parsing
-        // Return the extracted gender
-        return "male";
-    }
+
+
 }
